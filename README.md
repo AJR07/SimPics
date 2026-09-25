@@ -1,7 +1,18 @@
-# Tauri + Dioxus
+# SimPics
 
-This template should help get you started developing with Tauri and Dioxus.
+An app to track, manage and organize your beautiful sim screenshots :)
 
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) + [Dioxus](https://marketplace.visualstudio.com/items?itemName=DioxusLabs.dioxus).
+## TODO
+- [ ] Tracking/Extracting Screenshot Metadata
+  - [ ] Tracking screenshots being added to screenshot folder
+  - [ ] SimConnect Integration for various metadata (e.g., aircraft type, location, time of day, date)
+  - [ ] Volanta/ElevateX/Vatsim Integration for additional metadata (e.g., flight plan)
+- [ ] Displaying of Images
+  - [ ] Gallery Views
+  - [ ] Sorting
+  - [ ] Filtering
+  - [ ] Grouping
+  - [ ] Map View
+  - [ ] (maybe) Auto-generated collages
+- [ ] Import data
+  - [ ] Allow users to import past screenshots by syncing with Volanta or other 3rd party apps to retrieve metadata when available
