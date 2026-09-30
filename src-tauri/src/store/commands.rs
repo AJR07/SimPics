@@ -40,7 +40,7 @@ pub fn set_store_value(
     app: AppHandle,
     key: String,
     value: serde_json::Value,
-) -> Result<bool, String> {
+) -> Result<String, String> {
     let store = app
         .store("settings.json")
         .map_err(|e| e.to_string())?;
@@ -49,5 +49,5 @@ pub fn set_store_value(
 
     store.save().map_err(|e| e.to_string())?;
 
-    Ok(true)
+    Ok("Success!".to_owned())
 }
