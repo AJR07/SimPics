@@ -1,0 +1,9 @@
+.row {
+	display: flex;
+	flex-direction: row;
+	gap: 1rem;
+}
+
+.textfield {
+	flex-grow: 1;
+}

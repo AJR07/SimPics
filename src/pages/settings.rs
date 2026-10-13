@@ -1,5 +1,9 @@
 use dioxus::prelude::*;
 use serde_json::{json, Value};
+use crate::components::{button::Button, input::Input, label::Label};
+
+#[css_module("/src/pages/settings.css")]
+struct Styles;
 
 const SCREENSHOTS_KEY: &str = "screenshots_dir";
 const DEFAULT_SCREENSHOTS_DIR: &str = "C:\\Users\\User\\Pictures\\Screenshots";
@@ -56,12 +60,21 @@ pub fn Settings() -> Element {
 				        }
 				    });
 				},
-				input {
-					value: "{screenshot_dir}",
-					disabled: is_loading,
-					oninput: move |e| screenshot_dir.set(e.value()),
+
+				div { class: Styles::row,
+					Label { html_for: "screenshot-dir", "Screenshot Directory" }
+
+					Input {
+						class: Styles::textfield,
+						id: "screenshot-dir",
+						placeholder: "C:\\Users\\User\\OneDrive\\Pictures\\Screenshots",
+						value: screenshot_dir,
+						disabled: is_loading,
+						oninput: move |e: FormEvent| screenshot_dir.set(e.value()),
+					}
+
+					Button { r#type: "submit", disabled: is_loading, "Save" }
 				}
-				button { r#type: "submit", disabled: is_loading, "Save" }
 			}
 		}
 	}
