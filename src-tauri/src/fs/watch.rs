@@ -4,6 +4,7 @@ use futures::{
 };
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
+use tauri::{AppHandle, Emitter};
 
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (mut tx, rx) = channel(1);
@@ -22,7 +23,7 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Resul
     Ok((watcher, rx))
 }
 
-pub async fn async_watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
+pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Result<()> {
     let (mut watcher, mut rx) = async_watcher()?;
 
     // Add a path to be watched. All files and directories at that path and
@@ -31,8 +32,12 @@ pub async fn async_watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
 
     while let Some(res) = rx.next().await {
         match res {
-            Ok(event) => println!("changed: {event:?}"),
-            Err(e) => println!("watch error: {e:?}"),
+            Ok(event) => {app.emit("file-watcher_change", format!("changed: {event:?}")).unwrap();
+            println!("changed: {event:?}")
+        },
+            Err(e) => {app.emit("file-watcher_error", format!("watch error: {e:?}")).unwrap();
+            println!("watch error: {e:?}")
+        },
         }
     }
 
