@@ -2,6 +2,7 @@
 
 use dioxus::prelude::*;
 use wasm_bindgen::prelude::*;
+use crate::components::navbar::Pages;
 
 static CSS: Asset = asset!("/assets/styles.css");
 static DX_THEME: Asset = asset!("/assets/dx-components-theme.css");
@@ -14,6 +15,7 @@ extern "C" {
 
 #[component]
 pub fn App() -> Element {
+    let active_page = use_signal(|| Pages::Home);
     rsx! {
         link { rel: "preconnect", href: "https://fonts.googleapis.com" }
         link {
@@ -27,6 +29,14 @@ pub fn App() -> Element {
         }
         link { rel: "stylesheet", href: CSS }
         link { rel: "stylesheet", href: DX_THEME }
-        main { crate::pages::settings::Settings {} }
+        main {
+            crate::components::navbar::Navbar { active_page }
+            match *active_page.read() {
+                Pages::Home => rsx! {
+                    h1 { "Home Page" }
+                },
+                Pages::Settings => crate::pages::settings::Settings(),
+            }
+        }
     }
 }

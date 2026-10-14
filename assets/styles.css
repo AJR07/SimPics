@@ -3,4 +3,11 @@ body {
   font-optical-sizing: auto;
   background-color: black;
   color: white;
+  margin: 0;
+}
+
+main {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
 }
