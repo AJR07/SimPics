@@ -1,9 +1,15 @@
+.container {
+	padding: 1rem;
+	padding-left: 0rem;
+}
+
 .row {
 	display: flex;
 	flex-direction: row;
 	gap: 1rem;
+	width: 100%;
 }
 
 .textfield {
-	flex-grow: 1;
+	flex: 1;
 }

@@ -42,7 +42,7 @@ pub fn Settings() -> Element {
     let is_loading = loader.read().is_none();
 
     rsx! {
-        div { class: "container",
+        div { class: Styles::container,
             h1 { "Settings" }
 
             if is_loading {
