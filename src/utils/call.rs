@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use serde::de::DeserializeOwned;
-use serde_json::{Value};
+use serde_json::Value;
 use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 

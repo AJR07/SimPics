@@ -1,4 +1,4 @@
-use crate::components::button::{Button, ButtonVariant, ButtonSize};
+use crate::components::button::{Button, ButtonSize, ButtonVariant};
 use dioxus_icons::lucide::{House, Settings};
 
 use dioxus::prelude::*;
@@ -13,7 +13,7 @@ pub enum Pages {
 
 #[derive(PartialEq, Clone, Props)]
 pub struct NavbarProps {
-  active_page: Signal<Pages>,
+    active_page: Signal<Pages>,
 }
 
 #[component]

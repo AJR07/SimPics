@@ -1,14 +1,9 @@
-use tauri::{AppHandle};
+use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
 #[tauri::command]
-pub fn get_store_value(
-    app: AppHandle,
-    key: String,
-) -> Result<serde_json::Value, String> {
-    let store = app
-        .store("settings.json")
-        .map_err(|e| e.to_string())?;
+pub fn get_store_value(app: AppHandle, key: String) -> Result<serde_json::Value, String> {
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     store
         .get(&key)
@@ -21,9 +16,7 @@ pub fn get_store_value_with_default(
     key: String,
     default: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    let store = app
-        .store("settings.json")
-        .map_err(|e| e.to_string())?;
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     match store.get(&key) {
         Some(value) => Ok(value),
@@ -41,9 +34,7 @@ pub fn set_store_value(
     key: String,
     value: serde_json::Value,
 ) -> Result<String, String> {
-    let store = app
-        .store("settings.json")
-        .map_err(|e| e.to_string())?;
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     store.set(key, value);
 

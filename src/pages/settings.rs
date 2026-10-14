@@ -1,6 +1,6 @@
-use dioxus::prelude::*;
-use serde_json::{json, Value};
 use crate::components::{button::Button, input::Input, label::Label};
+use dioxus::prelude::*;
+use serde_json::{Value, json};
 
 #[css_module("/src/pages/settings.css")]
 struct Styles;
@@ -18,9 +18,12 @@ async fn get_screenshot_dir() -> Result<String, String> {
 
 async fn set_screenshot_dir(value: String) -> Result<(), String> {
     // Ignore whatever the command returns; we only care whether it succeeded.
-    crate::utils::call::call::<Value>("set_store_value", json!({ "key": SCREENSHOTS_KEY, "value": value }))
-        .await
-        .map(|_| ())
+    crate::utils::call::call::<Value>(
+        "set_store_value",
+        json!({ "key": SCREENSHOTS_KEY, "value": value }),
+    )
+    .await
+    .map(|_| ())
 }
 
 #[component]
@@ -39,43 +42,43 @@ pub fn Settings() -> Element {
     let is_loading = loader.read().is_none();
 
     rsx! {
-		div { class: "container",
-			h1 { "Settings" }
+        div { class: "container",
+            h1 { "Settings" }
 
-			if is_loading {
-				p { "Loading..." }
-			}
-			if let Some(msg) = status() {
-				p { "{msg}" }
-			}
+            if is_loading {
+                p { "Loading..." }
+            }
+            if let Some(msg) = status() {
+                p { "{msg}" }
+            }
 
-			form {
-				onsubmit: move |e| {
-				    e.prevent_default();
-				    let value = screenshot_dir();
-				    spawn(async move {
-				        match set_screenshot_dir(value).await {
-				            Ok(()) => status.set(Some("Saved!".into())),
-				            Err(e) => status.set(Some(format!("Save failed: {e}"))),
-				        }
-				    });
-				},
+            form {
+                onsubmit: move |e| {
+                    e.prevent_default();
+                    let value = screenshot_dir();
+                    spawn(async move {
+                        match set_screenshot_dir(value).await {
+                            Ok(()) => status.set(Some("Saved!".into())),
+                            Err(e) => status.set(Some(format!("Save failed: {e}"))),
+                        }
+                    });
+                },
 
-				div { class: Styles::row,
-					Label { html_for: "screenshot-dir", "Screenshot Directory" }
+                div { class: Styles::row,
+                    Label { html_for: "screenshot-dir", "Screenshot Directory" }
 
-					Input {
-						class: Styles::textfield,
-						id: "screenshot-dir",
-						placeholder: "C:\\Users\\User\\OneDrive\\Pictures\\Screenshots",
-						value: screenshot_dir,
-						disabled: is_loading,
-						oninput: move |e: FormEvent| screenshot_dir.set(e.value()),
-					}
+                    Input {
+                        class: Styles::textfield,
+                        id: "screenshot-dir",
+                        placeholder: "C:\\Users\\User\\OneDrive\\Pictures\\Screenshots",
+                        value: screenshot_dir,
+                        disabled: is_loading,
+                        oninput: move |e: FormEvent| screenshot_dir.set(e.value()),
+                    }
 
-					Button { r#type: "submit", disabled: is_loading, "Save" }
-				}
-			}
-		}
-	}
+                    Button { r#type: "submit", disabled: is_loading, "Save" }
+                }
+            }
+        }
+    }
 }

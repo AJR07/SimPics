@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 
+use crate::components::navbar::Pages;
 use dioxus::prelude::*;
 use wasm_bindgen::prelude::*;
-use crate::components::navbar::Pages;
 
 static CSS: Asset = asset!("/assets/styles.css");
 static DX_THEME: Asset = asset!("/assets/dx-components-theme.css");
@@ -32,9 +32,7 @@ pub fn App() -> Element {
         main {
             crate::components::navbar::Navbar { active_page }
             match *active_page.read() {
-                Pages::Home => rsx! {
-                    h1 { "Home Page" }
-                },
+                Pages::Home => crate::pages::home::Home(),
                 Pages::Settings => crate::pages::settings::Settings(),
             }
         }
