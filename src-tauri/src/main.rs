@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    simpics_lib::run()
+    tauri::async_runtime::block_on(simpics_lib::run());
 }

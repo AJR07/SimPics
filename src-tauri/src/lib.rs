@@ -1,10 +1,23 @@
 mod fs;
 mod store;
+mod db;
 
 const SCREENSHOTS_KEY: &str = "screenshots_dir";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub async fn run() {
+    //* initialize tracing
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_test_writer()
+        .init();
+
+    // * initialize database
+    let db_conn = match db::interface::init().await {
+        Ok(r) => {tracing::info!("Database initialized successfully."); r},
+        Err(e) => {tracing::error!("Failed to initialize database: {}", e); panic!("{}", "Unrecoverable - DB")},
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
