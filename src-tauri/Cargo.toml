@@ -27,7 +27,7 @@ tauri-plugin-fs = "2"
 tauri-plugin-store = "2"
 notify = { version = "8.2.0", features = ["serde"] }
 futures = "0.3.34"
-sea-orm = { version = "2.0.0", features = [ "sqlx-sqlite", "runtime-tokio", "macros", "debug-print" ] }
+sea-orm = { version = "2.0.0", features = [ "sqlx-sqlite", "runtime-tokio", "macros", "debug-print", "schema-sync" ] }
 tracing-subscriber = "0.3.23"
 tracing = "0.1.44"
 dirs = "7.0.0"

@@ -1,8 +1,11 @@
+mod db;
 mod fs;
 mod store;
-mod db;
+use std::sync::OnceLock;
 
 const SCREENSHOTS_KEY: &str = "screenshots_dir";
+
+static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
@@ -11,12 +14,6 @@ pub async fn run() {
         .with_max_level(tracing::Level::DEBUG)
         .with_test_writer()
         .init();
-
-    // * initialize database
-    let db_conn = match db::interface::init().await {
-        Ok(r) => {tracing::info!("Database initialized successfully."); r},
-        Err(e) => {tracing::error!("Failed to initialize database: {}", e); panic!("{}", "Unrecoverable - DB")},
-    };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -28,9 +25,24 @@ pub async fn run() {
             store::commands::get_store_value_with_default
         ])
         .setup(|app| {
+            // lock app handle
+            APP_HANDLE.set(app.handle().to_owned()).unwrap();
+
             let handle = app.handle().clone();
 
             tauri::async_runtime::spawn(async move {
+                // * initialize database
+                let db_conn = match db::interface::init(handle.clone()).await {
+                    Ok(r) => {
+                        tracing::info!("Database initialized successfully.");
+                        r
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to initialize database: {}", e);
+                        panic!("{}", "Unrecoverable - DB")
+                    }
+                };
+
                 let path = match store::commands::get_store_value(
                     handle.clone(),
                     SCREENSHOTS_KEY.to_string(),
