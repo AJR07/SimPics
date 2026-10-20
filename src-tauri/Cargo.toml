@@ -31,6 +31,7 @@ sea-orm = { version = "2.0.0", features = [ "sqlx-sqlite", "runtime-tokio", "mac
 tracing-subscriber = "0.3.23"
 tracing = "0.1.44"
 dirs = "7.0.0"
+chrono = "0.4.45"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

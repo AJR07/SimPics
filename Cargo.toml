@@ -18,4 +18,4 @@ dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version 
 dioxus-icons = { version = "0.1.0", default-features = false }
 
 [workspace]
-members = ["src-tauri"]
+members = ["src-tauri", "src-tauri/migration"]
