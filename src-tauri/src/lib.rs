@@ -22,7 +22,9 @@ pub async fn run() {
         .invoke_handler(tauri::generate_handler![
             store::commands::get_store_value,
             store::commands::set_store_value,
-            store::commands::get_store_value_with_default
+            store::commands::get_store_value_with_default,
+            db::commands::get_entry,
+            db::commands::delete_entry
         ])
         .setup(|app| {
             // lock app handle
@@ -32,7 +34,7 @@ pub async fn run() {
 
             tauri::async_runtime::spawn(async move {
                 // * initialize database
-                let db_conn = match db::interface::init(handle.clone()).await {
+                match db::commands::init(handle.clone()).await {
                     Ok(r) => {
                         tracing::info!("Database initialized successfully.");
                         r

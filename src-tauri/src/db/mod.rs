@@ -1,2 +1,2 @@
-pub mod interface;
-mod schema;
+pub mod commands;
+pub mod schema;
