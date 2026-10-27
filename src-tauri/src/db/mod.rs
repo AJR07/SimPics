@@ -1,2 +1,2 @@
 pub mod commands;
-pub mod schema;
+pub mod screenshot_schema;

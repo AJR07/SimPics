@@ -1,8 +1,11 @@
-use std::sync::OnceLock;
-use sea_orm::{Database, DatabaseConnection, EntityTrait, ModelTrait};
-use tauri::AppHandle;
+use crate::{
+    db::screenshot_schema::{ActiveModel, Entity, Model, OptionalModel}, fs,
+};
+use sea_orm::{ActiveValue::Set, Database, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait};
 use serde::Serialize;
-use crate::{db::schema::{Entity, Model}, fs};
+use std::sync::OnceLock;
+use tauri::AppHandle;
+use sea_orm::ActiveModelTrait;
 
 static DB_CONN: OnceLock<DatabaseConnection> = OnceLock::new();
 
@@ -12,6 +15,8 @@ pub enum DbError {
     NotInitialized,
     #[error("multiple rows deleted")]
     MultipleRowsDeleted,
+    #[error("object not found")]
+    EntryNotFound,
     #[error("database error: {0}")]
     Db(#[from] sea_orm::DbErr),
 }
@@ -59,7 +64,7 @@ pub async fn init(app: AppHandle) -> Result<DatabaseConnection, Box<dyn std::err
 
 // If entry not found, returned as None
 #[tauri::command]
-pub async fn get_entry(name: String) -> Result<Option<Model>, DbError>  {
+pub async fn get_entry(name: String) -> Result<Option<Model>, DbError> {
     let db_conn = conn()?;
     let res: Option<Model> = Entity::find_by_id(name).one(db_conn).await?;
     Ok(res)
@@ -75,7 +80,7 @@ pub async fn delete_entry(name: String) -> Result<bool, DbError> {
     let db_conn = conn()?;
 
     let res = model.delete(db_conn).await?;
-    
+
     if res.rows_affected <= 1 {
         Ok(res.rows_affected == 1)
     } else {
@@ -83,38 +88,52 @@ pub async fn delete_entry(name: String) -> Result<bool, DbError> {
     }
 }
 
-// #[tauri::command]
-// pub async fn insert_entry(name: String) -> Result<Option<Model>, Box<dyn std::error::Error>>  {
-//     let db_conn = conn()?;
-//     let res: Option<Model> = match Entity::find_by_id(name.clone()).one(db_conn).await {
-//         Ok(r) => r,
-//         Err(e) => {tracing::debug!("{}", format!("Couldn't get entry with name: {name} due to error: {e}")); return Err(Box::new(e))}
-//     };
-//     Ok(res)
-// }
+#[tauri::command]
+pub async fn insert_entry(new_entry: Model) -> Result<(), DbError> {
+    let db_conn = conn()?;
+    let active_new_entry = new_entry.into_active_model();
+    Entity::insert(active_new_entry).exec(db_conn).await?;
+    Ok(())
+}
 
-// #[tauri::command]
-// pub async fn update_entry(name: String) -> Result<Option<Model>, Box<dyn std::error::Error>>  {
-//     let db_conn = conn()?;
-//     let res: Option<Model> = match Entity::find_by_id(name.clone()).one(db_conn).await {
-//         Ok(r) => r,
-//         Err(e) => {tracing::debug!("{}", format!("Couldn't get entry with name: {name} due to error: {e}")); return Err(Box::new(e))}
-//     };
-//     Ok(res)
-// }
+#[tauri::command]
+pub async fn update_entry(old_name: String, updated_entry: OptionalModel) -> Result<bool, DbError> {
+    let db_conn = conn()?;
+    let mut old_entry: ActiveModel = match get_entry(old_name).await? {
+        Some(r) => r.into(),
+        None => return Err(DbError::EntryNotFound)
+    };
+    
+    // update old entry with new changes
+    if let Some(r) = updated_entry.name {  
+        old_entry.name = Set(r);
+    }
 
-// #[tauri::command]
-// pub async fn get_full_table(name: String) -> Result<Option<Model>, Box<dyn std::error::Error>>  {
-//     let db_conn = conn()?;
-//     let res: Option<Model> = match Entity::find_by_id(name.clone()).one(db_conn).await {
-//         Ok(r) => r,
-//         Err(e) => {tracing::debug!("{}", format!("Couldn't get entry with name: {name} due to error: {e}")); return Err(Box::new(e))}
-//     };
-//     Ok(res)
-// }
+    if let Some(r) = updated_entry.date {  
+        old_entry.date = Set(r);
+    }
 
-pub async fn close(db: DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
+    old_entry.update(db_conn).await?;
+
+    Ok(true)
+}
+
+#[tauri::command]
+pub async fn get_full_table() -> Result<Vec<Model>, DbError> {
+    let db_conn = conn()?;
+    let res: Vec<Model> = Entity::find().all(db_conn).await?;
+    Ok(res)
+}
+
+pub async fn close() -> Result<(), DbError> {
+    let db_conn = conn()?.clone();
     // Closing connection here
-    db.close().await?;
+    match db_conn.close().await {
+        Ok(()) => tracing::info!("Database closed successfully"),
+        Err(e) => tracing::info!(
+            "{}",
+            format!("Attempted to close database but encountered an error: {e}")
+        ),
+    }
     Ok(())
 }

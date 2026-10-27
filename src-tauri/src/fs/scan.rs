@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use std::fs;
 use tauri::AppHandle;
 
-use crate::db::schema::Model;
+use crate::db::screenshot_schema::Model;
 use crate::store;
 
 pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
