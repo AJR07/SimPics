@@ -2,7 +2,7 @@ mod db;
 mod fs;
 mod store;
 use std::sync::OnceLock;
-use tauri::{Emitter, WindowEvent};
+use tauri::WindowEvent;
 
 const SCREENSHOTS_KEY: &str = "screenshots_dir";
 

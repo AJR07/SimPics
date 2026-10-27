@@ -57,7 +57,7 @@ pub async fn init(app: AppHandle) -> Result<DatabaseConnection, Box<dyn std::err
     db.get_schema_builder().register(Entity).sync(&db).await?;
 
     // scan and implement changes
-    fs::scan::full_scan(app);
+    fs::scan::apply_full_changes(app).await?; // for now, unwrap
 
     Ok(db)
 }

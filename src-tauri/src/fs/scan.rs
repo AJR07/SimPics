@@ -1,8 +1,13 @@
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 use std::fs;
 use tauri::AppHandle;
 
-use crate::db::screenshot_schema::Model;
+use crate::db::{
+    commands,
+    screenshot_schema::{Model, OptionalModel},
+};
+
 use crate::store;
 
 pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
@@ -61,4 +66,91 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
     }
 
     Ok(res)
+}
+
+pub async fn apply_full_changes(app: AppHandle) -> Result<(), String> {
+    // Complete a full scan (use `?` instead of unwrap so a failed scan doesn't panic)
+    let file_list = full_scan(app)?;
+
+    // Get old data
+    let old_data = crate::db::commands::get_full_table()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Index the DB rows by file name
+    let mut old_map: HashMap<String, Model> =
+        old_data.into_iter().map(|m| (m.name.clone(), m)).collect();
+
+    let mut to_insert: Vec<Model> = Vec::new();
+    let mut to_update: Vec<(String, OptionalModel)> = Vec::new();
+
+    for scanned in file_list {
+        match old_map.remove(&scanned.name) {
+            // 1. In the scan, not in the DB -> new file
+            None => to_insert.push(scanned),
+
+            // 2. In both, but the date differs -> updated
+            // (compare in seconds, see note below)
+            Some(old) if old.date.timestamp() != scanned.date.timestamp() => {
+                to_update.push((
+                    old.name,
+                    OptionalModel {
+                        date: Some(scanned.date),
+                        name: None,
+                    },
+                ));
+            }
+
+            // 4. In both and identical -> nothing to do
+            Some(_) => {}
+        }
+    }
+
+    // 3. Anything still in old_map was in the DB but not in the scan -> deleted
+    let to_delete: Vec<Model> = old_map.into_values().collect();
+
+    tracing::info!(
+        "Scan diff: {} new, {} updated, {} deleted",
+        to_insert.len(),
+        to_update.len(),
+        to_delete.len()
+    );
+
+    // * Apply to DB
+    for entry in to_insert.iter() {
+        if let Err(e) = commands::insert_entry(entry.clone()).await {
+            tracing::error!("Cannot insert entry due to: {}", e);
+            return Err(e.to_string());
+        }
+    }
+
+    for entry in to_update.iter() {
+        match commands::update_entry(entry.clone().0, entry.clone().1).await {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::error!("Entry wasn't found in database");
+                return Err("Entry wasn't found in database".to_string());
+            }
+            Err(e) => {
+                tracing::error!("Cannot update entry due to: {}", e);
+                return Err(e.to_string());
+            }
+        }
+    }
+
+    for entry in to_delete.iter() {
+        match commands::delete_entry(entry.clone().name).await {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::error!("Entry wasn't found in database");
+                return Err("Entry wasn't found in database".to_string());
+            }
+            Err(e) => {
+                tracing::error!("Cannot delete entry due to: {}", e);
+                return Err(e.to_string());
+            }
+        }
+    }
+
+    Ok(())
 }
