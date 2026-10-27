@@ -1,0 +1,9 @@
+[package]
+name = "simpics-shared"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde.workspace = true
+chrono.workspace = true
+optional_struct.workspace = true

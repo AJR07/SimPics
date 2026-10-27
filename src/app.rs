@@ -16,6 +16,8 @@ extern "C" {
 #[component]
 pub fn App() -> Element {
     let active_page = use_signal(|| Pages::Home);
+    let page = active_page();
+
     rsx! {
         link { rel: "preconnect", href: "https://fonts.googleapis.com" }
         link {
@@ -31,9 +33,13 @@ pub fn App() -> Element {
         link { rel: "stylesheet", href: DX_THEME }
         main {
             crate::components::navbar::Navbar { active_page }
-            match *active_page.read() {
-                Pages::Home => crate::pages::home::Home(),
-                Pages::Settings => crate::pages::settings::Settings(),
+            match page {
+                Pages::Home => rsx! {
+                    crate::pages::home::Home {}
+                },
+                Pages::Settings => rsx! {
+                    crate::pages::settings::Settings {}
+                },
             }
         }
     }

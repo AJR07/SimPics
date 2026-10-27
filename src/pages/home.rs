@@ -1,64 +1,36 @@
 use dioxus::prelude::*;
-use serde::Deserialize;
-use serde_json::json;
-use wasm_bindgen::prelude::*;
+use serde_json::{Value::Null};
+use simpics_shared::ScreenshotEntry;
 
 #[css_module("/src/pages/home.css")]
 struct Styles;
 
-const SCREENSHOTS_KEY: &str = "screenshots_dir";
-
-async fn get_screenshot_dir() -> Result<String, String> {
-    crate::utils::call::call("get_store_value", json!({ "key": SCREENSHOTS_KEY })).await
-}
-
-#[derive(Deserialize)]
-struct TauriEvent<T> {
-    payload: T,
-}
-
 #[component]
 pub fn Home() -> Element {
-    let mut screenshot_dir = use_signal(String::new);
     let mut status = use_signal(|| None::<String>);
+    let mut screenshot_list = use_signal(|| None::<Vec<ScreenshotEntry>>);
 
-    // Load the stored value once and copy it into the editable signal.
-    let loader = use_resource(get_screenshot_dir);
-    use_effect(move || match &*loader.read() {
-        Some(Ok(dir)) => screenshot_dir.set(dir.clone()),
+    let loader = use_resource(|| async {
+        crate::utils::call::call::<Vec<ScreenshotEntry>>("get_full_table", Null).await
+    });
+    match &*loader.read() {
+        Some(Ok(list)) => screenshot_list.set(Some(list.clone())),
         Some(Err(e)) => status.set(Some(e.clone())),
         None => {}
-    });
-
-    // listen for changes
-    use_future(move || async move {
-        let cb = Closure::<dyn FnMut(JsValue)>::new(move |ev: JsValue| {
-            if let Ok(e) = serde_wasm_bindgen::from_value::<TauriEvent<String>>(ev) {
-                status.set(Some(e.payload));
-            }
-        });
-
-        match crate::utils::listen::listen("file-watcher_change", &cb).await {
-            Ok(_) => cb.forget(),
-            Err(e) => {
-                status.set(Some(format!(
-                    "Failed to listen for file changes: {}",
-                    e.as_string().unwrap_or_else(|| "unknown error".into())
-                )));
-            }
-        }
-    });
+    };
 
     rsx! {
-        div { class: "container",
+        div {
             h1 { "Home" }
 
-            if loader.read().is_none() {
-                p { "Loading..." }
-            } else if let Some(msg) = status() {
+            if let Some(msg) = status() {
                 p { "{msg}" }
-            } else {
-                p { "HI" }
+            }
+            if let Some(list) = screenshot_list() {
+                p { "Number of Rows: {list.len()}" }
+                for screenshot_entry in list.iter() {
+                    p { "Name: {screenshot_entry.name}, Date: {screenshot_entry.date}" }
+                }
             }
         }
     }

@@ -33,11 +33,11 @@ pub fn Settings() -> Element {
 
     // Load the stored value once and copy it into the editable signal.
     let loader = use_resource(get_screenshot_dir);
-    use_effect(move || match &*loader.read() {
+    match &*loader.read() {
         Some(Ok(dir)) => screenshot_dir.set(dir.clone()),
         Some(Err(e)) => status.set(Some(e.clone())),
         None => {}
-    });
+    };
 
     let is_loading = loader.read().is_none();
 

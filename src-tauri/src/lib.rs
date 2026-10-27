@@ -2,7 +2,7 @@ mod db;
 mod fs;
 mod store;
 use std::sync::OnceLock;
-use tauri::WindowEvent;
+use tauri::{Emitter, WindowEvent};
 
 const SCREENSHOTS_KEY: &str = "screenshots_dir";
 
@@ -57,6 +57,7 @@ pub async fn run() {
                     }
                 };
 
+                // * watch for changes
                 let path = match store::commands::get_store_value(
                     handle.clone(),
                     SCREENSHOTS_KEY.to_string(),
