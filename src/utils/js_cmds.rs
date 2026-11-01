@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = convertFileSrc, js_namespace = ["__TAURI__", "core"])]
-    fn convert_file_src(file_path: &str) -> String;
+    pub fn convert_file_src(file_path: &str) -> String;
 
     #[wasm_bindgen(catch, js_namespace = ["window", "__TAURI__", "core"], js_name = invoke)]
     async fn invoke(cmd: &str, args: JsValue) -> Result<JsValue, JsValue>;

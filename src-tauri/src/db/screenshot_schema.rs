@@ -13,7 +13,8 @@ use optional_struct::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub name: String,
-    pub date: DateTime<Utc>
+    pub date: DateTime<Utc>,
+    pub path: String
 }
 
 impl ActiveModelBehavior for ActiveModel {}

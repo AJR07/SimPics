@@ -7,4 +7,5 @@ use serde::{Deserialize, Serialize};
 pub struct ScreenshotEntry {
     pub name: String,
     pub date: DateTime<Utc>,
+    pub path: String
 }

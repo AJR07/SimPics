@@ -90,6 +90,10 @@ pub async fn update_entry(old_name: String, updated_entry: OptionalModel) -> Res
         old_entry.date = Set(r);
     }
 
+    if let Some(r) = updated_entry.path {
+        old_entry.path = Set(r);
+    }
+
     old_entry.update(db_conn).await?;
 
     Ok(true)

@@ -10,7 +10,8 @@ main {
   display: flex;
   flex-direction: row;
   gap: 1rem;
-  overflow-x: none;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 main > :nth-child(2) {

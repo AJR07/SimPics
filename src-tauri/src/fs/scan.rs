@@ -61,6 +61,7 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
         let new_screenshot = Model {
             name: name.to_string(),
             date: file_created_date,
+            path: path.to_string_lossy().to_string()
         };
 
         res.push(new_screenshot);
@@ -98,6 +99,7 @@ pub async fn apply_full_changes(app: AppHandle) -> Result<(), String> {
                     OptionalModel {
                         date: Some(scanned.date),
                         name: None,
+                        path: None
                     },
                 ));
             }

@@ -31,6 +31,7 @@ fn get_file_details(file_path: PathBuf) -> Result<Model, String> {
     Ok(Model {
         name,
         date: date_utc,
+        path: file_path.to_string_lossy().to_string()
     })
 }
 
