@@ -1,36 +1,9 @@
 use crate::{
-    db::screenshot_schema::{ActiveModel, Entity, Model, OptionalModel}, fs,
+    db::{screenshot_schema::{ActiveModel, Entity, Model, OptionalModel}, utils::{DB_CONN, conn, DbError, full_update_frontend}}, fs,
 };
 use sea_orm::{ActiveValue::Set, Database, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait};
-use serde::Serialize;
-use std::sync::OnceLock;
-use tauri::AppHandle;
+use tauri::{AppHandle};
 use sea_orm::ActiveModelTrait;
-
-static DB_CONN: OnceLock<DatabaseConnection> = OnceLock::new();
-
-#[derive(Debug, thiserror::Error)]
-pub enum DbError {
-    #[error("database connection not initialized")]
-    NotInitialized,
-    #[error("multiple rows deleted")]
-    MultipleRowsDeleted,
-    #[error("object not found")]
-    EntryNotFound,
-    #[error("database error: {0}")]
-    Db(#[from] sea_orm::DbErr),
-}
-
-// Tauri needs errors to be serializable to send them to the frontend
-impl Serialize for DbError {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.to_string())
-    }
-}
-
-fn conn() -> Result<&'static DatabaseConnection, DbError> {
-    DB_CONN.get().ok_or(DbError::NotInitialized)
-}
 
 pub async fn init(app: AppHandle) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     let mut full_path = dirs::data_local_dir().unwrap();
@@ -82,6 +55,7 @@ pub async fn delete_entry(name: String) -> Result<bool, DbError> {
     let res = model.delete(db_conn).await?;
 
     if res.rows_affected <= 1 {
+        full_update_frontend().await?;
         Ok(res.rows_affected == 1)
     } else {
         Err(DbError::MultipleRowsDeleted)
@@ -93,6 +67,9 @@ pub async fn insert_entry(new_entry: Model) -> Result<(), DbError> {
     let db_conn = conn()?;
     let active_new_entry = new_entry.into_active_model();
     Entity::insert(active_new_entry).exec(db_conn).await?;
+
+    // update frontend
+    full_update_frontend().await?;
     Ok(())
 }
 

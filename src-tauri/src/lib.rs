@@ -12,7 +12,7 @@ static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 pub async fn run() {
     //* initialize tracing
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::WARN)
         .with_test_writer()
         .init();
 
