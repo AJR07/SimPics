@@ -1,6 +1,7 @@
 use crate::components::{button::Button, input::Input, label::Label};
 use dioxus::prelude::*;
 use serde_json::{Value, json};
+use crate::utils::js_cmds;
 
 #[css_module("/src/pages/settings.css")]
 struct Styles;
@@ -9,7 +10,7 @@ const SCREENSHOTS_KEY: &str = "screenshots_dir";
 const DEFAULT_SCREENSHOTS_DIR: &str = "C:\\Users\\User\\Pictures\\Screenshots";
 
 async fn get_screenshot_dir() -> Result<String, String> {
-    crate::utils::call::call(
+    js_cmds::call(
         "get_store_value_with_default",
         json!({ "key": SCREENSHOTS_KEY, "default": DEFAULT_SCREENSHOTS_DIR }),
     )
@@ -18,7 +19,7 @@ async fn get_screenshot_dir() -> Result<String, String> {
 
 async fn set_screenshot_dir(value: String) -> Result<(), String> {
     // Ignore whatever the command returns; we only care whether it succeeded.
-    crate::utils::call::call::<Value>(
+    js_cmds::call::<Value>(
         "set_store_value",
         json!({ "key": SCREENSHOTS_KEY, "value": value }),
     )
@@ -56,6 +57,7 @@ pub fn Settings() -> Element {
                 onsubmit: move |e| {
                     e.prevent_default();
                     let value = screenshot_dir();
+                    // TODO: Check for valid directory, check its in $HOME
                     spawn(async move {
                         match set_screenshot_dir(value).await {
                             Ok(()) => status.set(Some("Saved!".into())),

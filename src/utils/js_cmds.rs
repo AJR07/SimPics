@@ -6,8 +6,17 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {
+    #[wasm_bindgen(js_name = convertFileSrc, js_namespace = ["__TAURI__", "core"])]
+    fn convert_file_src(file_path: &str) -> String;
+
     #[wasm_bindgen(catch, js_namespace = ["window", "__TAURI__", "core"], js_name = invoke)]
     async fn invoke(cmd: &str, args: JsValue) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "event"], catch)]
+    pub async fn listen(
+        event: &str,
+        handler: &Closure<dyn FnMut(JsValue)>,
+    ) -> Result<JsValue, JsValue>;
 }
 
 /// Calls a Tauri command and converts every failure mode into a `String` error.
