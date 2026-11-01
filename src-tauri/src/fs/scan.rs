@@ -42,13 +42,15 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
     let mut res: Vec<Model> = Vec::new();
 
     for path in paths {
-        let path_converted = path.unwrap().path();
-        let file_name = path_converted.to_str().unwrap();
+        let unwrapped_path = path.unwrap();
+        let full_path = unwrapped_path.path().to_str().unwrap();
+        let name = unwrapped_path.file_name();
+        let name_parsed = name.to_str().unwrap();
 
         // TODO: SUPPORT PARSING DATETIME FROM FILE NAME WITH UTC INPUT
         // retrieve date using the file's creation date (system-time => UTC)
         let file_created_date: DateTime<Utc> =
-            match fs::metadata(&file_name).and_then(|m| m.created()) {
+            match fs::metadata(&name).and_then(|m| m.created()) {
                 Ok(created) => DateTime::<Utc>::from(created),
                 Err(e) => {
                     tracing::error!("Cannot get created time from metadata: {e}");
@@ -58,7 +60,7 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
             };
 
         let new_screenshot = Model {
-            name: file_name.to_string(),
+            name: name_parsed.to_string(),
             date: file_created_date,
         };
 
