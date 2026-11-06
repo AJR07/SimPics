@@ -56,6 +56,88 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Resul
     Ok((watcher, rx))
 }
 
+// ^ Tracking the rename events
+#[derive(Default)]
+struct RenameTracker {
+    pending_from: Option<PathBuf>,
+}
+
+impl RenameTracker {
+    fn on_from(&mut self, paths: &[PathBuf]) {
+        match paths {
+            [] => {}
+            [p] => {
+                if let Some(stale) = self.pending_from.replace(p.clone()) {
+                    tracing::warn!("Name(From) {p:?} replaced an unpaired pending From: {stale:?}");
+                }
+            }
+            many => {
+                tracing::error!("Modify(Name(From)) with more than 1 path: {many:?}");
+                self.pending_from = None; // don't leave stale state behind
+            }
+        }
+    }
+
+    /// Returns (old, new) when this `To` completes a pair.
+    fn on_to(&mut self, paths: &[PathBuf]) -> Option<(PathBuf, PathBuf)> {
+        match paths {
+            [] => None,
+            [new] =>
+                match self.pending_from.take() {
+                    Some(old) => Some((old, new.clone())),
+                    None => {
+                        tracing::error!(
+                            "Received Modify(Name(To)) Event but no Name(From) event found."
+                        );
+                        None
+                    }
+                }
+            many => {
+                self.pending_from = None;
+                tracing::error!("Modify(Name(To)) with more than 1 path: {many:?}");
+                None
+            }
+        }
+    }
+}
+
+// ^ helper func for a rename event
+async fn rename_entry(old_path: &Path, new_path: &Path) {
+    // Windows can't tell us the kind on From, but the To path exists, so check it here
+    if new_path.is_dir() {
+        tracing::debug!("Ignoring rename of directory: {old_path:?} -> {new_path:?}");
+        return;
+    }
+
+    let Some(new_name) = file_name_string(new_path) else {
+        tracing::error!("New path has no valid UTF-8 file name: {new_path:?}");
+        return;
+    };
+    let Some(old_name) = file_name_string(old_path) else {
+        tracing::error!("Old path has no valid UTF-8 file name: {old_path:?}");
+        return;
+    };
+
+    let old_path_str = old_path.to_string_lossy().to_string();
+    let new_path_str = new_path.to_string_lossy().to_string();
+
+    let modify_obj = OptionalModel {
+        path: Some(new_path_str.clone()),
+        name: Some(new_name),
+        date: None,
+    };
+
+    match db::commands::update_entry(old_name, modify_obj).await {
+        Ok(true) => tracing::warn!("Updated {old_path_str} to {new_path_str}"),
+        Ok(false) =>
+            tracing::error!(
+                "WATCH x DB ERROR when applying update event: {old_path_str} does not exist"
+            ),
+        Err(e) => tracing::error!("WATCH x DB ERROR when applying update event: {e}"),
+    }
+}
+
+// ^ Function handling all the events for watch
 pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Result<()> {
     let (mut watcher, mut rx) = async_watcher()?;
 
@@ -64,7 +146,7 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
     watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
 
     // handler for From/To events
-    let mut prev_modify: Option<PathBuf> = None::<PathBuf>;
+    let mut tracker = RenameTracker::default();
 
     while let Some(res) = rx.next().await {
         match res {
@@ -88,108 +170,17 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
                             tracing::warn!("Created");
                         }
                     }
-                    EventKind::Modify(e) => {
-                        // filter for events of Name(From) and Name(To)
-                        match e {
-                            ModifyKind::Name(RenameMode::From) => {
-                                match event.paths.len() {
-                                    0 => {}
-                                    1 => {
-                                        prev_modify = Some(event.paths[0].clone());
-                                    }
-                                    _ => {
-                                        tracing::error!(
-                                            "Event {e:?} with more than 1 path for Modify(Name(From))"
-                                        );
-                                    }
-                                }
-                            }
-                            ModifyKind::Name(RenameMode::To) => {
-                                match event.paths.len() {
-                                    0 => {}
-                                    1 => {
-                                        if let None = prev_modify {
-                                            tracing::error!(
-                                                "Received Modify(Name(To)) Event but no Name(From) event found."
-                                            );
-                                        } else {
-                                            // * perform the update with the previous value
-                                            let Some(new_path) = event.paths.first().cloned() else {
-                                                continue;
-                                            };
-
-                                            let new_path_str = new_path
-                                                .to_string_lossy()
-                                                .to_string();
-
-                                            let Some(new_name) = file_name_string(&new_path) else {
-                                                tracing::error!(
-                                                    "New path has no valid UTF-8 file name: {new_path:?}"
-                                                );
-                                                continue;
-                                            };
-
-                                            // take() clears the pending state so it can't be reused by a later event
-                                            let Some(old_path) = prev_modify.take() else {
-                                                tracing::error!(
-                                                    "Received Modify(Name(To)) but no Name(From) was pending"
-                                                );
-                                                continue;
-                                            };
-
-                                            let old_path_str = old_path
-                                                .to_string_lossy()
-                                                .to_string();
-
-                                            let Some(old_name) = file_name_string(&old_path) else {
-                                                tracing::error!(
-                                                    "Old path has no valid UTF-8 file name: {old_path:?}"
-                                                );
-                                                continue;
-                                            };
-
-                                            // craft the modify object
-                                            let modify_obj = OptionalModel {
-                                                path: Some(new_path_str.clone()),
-                                                name: Some(new_name),
-                                                date: None,
-                                            };
-
-                                            // finally, update
-                                            match
-                                                db::commands::update_entry(
-                                                    old_name,
-                                                    modify_obj
-                                                ).await
-                                            {
-                                                Ok(true) =>
-                                                    tracing::warn!(
-                                                        "Updated {old_path_str} to {new_path_str}"
-                                                    ),
-                                                Ok(false) =>
-                                                    tracing::error!(
-                                                        "WATCH x DB ERROR when applying update event: {old_path_str} does not exist"
-                                                    ),
-                                                Err(e) =>
-                                                    tracing::error!(
-                                                        "WATCH x DB ERROR when applying update event: {e}"
-                                                    ),
-                                            };
-                                        }
-                                    }
-                                    _ => {
-                                        tracing::error!(
-                                            "Event {e:?} with more than 1 path for Modify(Name(To))"
-                                        );
-                                    }
-                                }
-                            }
-                            _ => {
-                                tracing::debug!(
-                                    "WATCH ERROR: Unhandled Event Kind: {e:?} with full event data: {event:?}"
-                                );
-                            }
+                    EventKind::Modify(ModifyKind::Name(RenameMode::From)) =>
+                        tracker.on_from(&event.paths),
+                    EventKind::Modify(ModifyKind::Name(RenameMode::To)) => {
+                        if let Some((old, new)) = tracker.on_to(&event.paths) {
+                            rename_entry(&old, &new).await;
                         }
+                    }
+                    EventKind::Modify(other) => {
+                        tracing::debug!(
+                            "WATCH: unhandled Modify kind: {other:?} with full event data: {event:?}"
+                        );
                     }
                     EventKind::Remove(_) => {
                         for path in event.paths {
