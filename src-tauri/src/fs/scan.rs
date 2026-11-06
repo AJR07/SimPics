@@ -40,7 +40,13 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
     let mut res: Vec<Model> = Vec::new();
 
     for dir_entry in paths {
-        let entry = dir_entry.unwrap();
+        let entry = match dir_entry {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::error!("Cannot read directory entry: {e}");
+                continue;
+            }
+        };
         let path = entry.path();
 
         if !path.is_file() {
@@ -123,39 +129,40 @@ pub async fn apply_full_changes(app: AppHandle) -> Result<(), String> {
     );
 
     // * Apply to DB
-    for entry in to_insert.iter() {
-        if let Err(e) = commands::insert_entry(entry.clone()).await {
-            tracing::error!("Cannot insert entry due to: {}", e);
-            return Err(e.to_string());
+    let mut failures = 0usize;
+
+    for entry in to_insert {
+        if let Err(e) = commands::insert_entry(entry).await {
+            tracing::error!("Cannot insert entry due to: {e}");
+            failures += 1;
         }
     }
 
-    for entry in to_update.iter() {
-        match commands::update_entry(entry.clone().0, entry.clone().1).await {
+    for (name, patch) in to_update {
+        match commands::update_entry(name.clone(), patch).await {
             Ok(true) => {}
-            Ok(false) => {
-                tracing::error!("Entry wasn't found in database");
-                return Err("Entry wasn't found in database".to_string());
-            }
+            Ok(false) => tracing::warn!("Update skipped, {name} is no longer in the DB"),
             Err(e) => {
-                tracing::error!("Cannot update entry due to: {}", e);
-                return Err(e.to_string());
+                tracing::error!("Cannot update entry {name} due to: {e}");
+                failures += 1;
             }
         }
     }
 
-    for entry in to_delete.iter() {
-        match commands::delete_entry(entry.clone().name).await {
+    for entry in to_delete {
+        let name = entry.name;
+        match commands::delete_entry(name.clone()).await {
             Ok(true) => {}
-            Ok(false) => {
-                tracing::error!("Entry wasn't found in database");
-                return Err("Entry wasn't found in database".to_string());
-            }
+            Ok(false) => tracing::warn!("Delete skipped, {name} is already gone from the DB"),
             Err(e) => {
-                tracing::error!("Cannot delete entry due to: {}", e);
-                return Err(e.to_string());
+                tracing::error!("Cannot delete entry {name} due to: {e}");
+                failures += 1;
             }
         }
+    }
+
+    if failures > 0 {
+        return Err(format!("{failures} DB operations failed during full scan"));
     }
 
     Ok(())
