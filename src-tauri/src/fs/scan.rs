@@ -80,8 +80,10 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
 }
 
 pub async fn apply_full_changes(app: AppHandle) -> Result<(), String> {
-    // Complete a full scan (use `?` instead of unwrap so a failed scan doesn't panic)
-    let file_list = full_scan(app)?;
+    // Complete a full scan - using spawn blocking for async results
+    let file_list = tauri::async_runtime
+        ::spawn_blocking(move || full_scan(app)).await
+        .map_err(|e| e.to_string())??;
 
     // Get old data
     let old_data = crate::db::commands::get_full_table().await.map_err(|e| e.to_string())?;
