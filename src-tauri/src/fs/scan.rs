@@ -104,13 +104,16 @@ pub async fn apply_full_changes(app: AppHandle) -> Result<(), String> {
 
             // 2. In both, but the date differs -> updated
             // (compare in seconds, see note below)
-            Some(old) if old.date.timestamp() != scanned.date.timestamp() => {
+            Some(old) if
+                old.date.timestamp() != scanned.date.timestamp() ||
+                old.path != scanned.path
+            => {
                 to_update.push((
                     old.name,
                     OptionalModel {
                         date: Some(scanned.date),
+                        path: Some(scanned.path),
                         name: None,
-                        path: None,
                     },
                 ));
             }
