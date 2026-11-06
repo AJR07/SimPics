@@ -1,9 +1,21 @@
 use crate::{
-    db::{screenshot_schema::{ActiveModel, Entity, Model, OptionalModel}, utils::{DB_CONN, conn, DbError, full_update_frontend}}, fs,
+    db::{
+        screenshot_schema::{ Column, Entity, Model, OptionalModel },
+        utils::{ DB_CONN, DbError, conn, full_update_frontend },
+    },
+    fs,
 };
-use sea_orm::{ActiveValue::Set, Database, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait};
-use tauri::{AppHandle};
-use sea_orm::ActiveModelTrait;
+use sea_orm::{
+    ColumnTrait,
+    QueryFilter,
+    Database,
+    DatabaseConnection,
+    EntityTrait,
+    IntoActiveModel,
+    ModelTrait,
+    sea_query::Expr,
+};
+use tauri::{ AppHandle };
 
 pub async fn init(app: AppHandle) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     let mut full_path = dirs::data_local_dir().unwrap();
@@ -16,12 +28,10 @@ pub async fn init(app: AppHandle) -> Result<DatabaseConnection, Box<dyn std::err
     let full_path_str = full_path.to_str().unwrap().to_string();
 
     // connect to db
-    tracing::info!(
-        "{}",
-        format!("Directory: sqlite:///{}?mode=rwc", full_path_str)
-    );
-    let db: DatabaseConnection =
-        Database::connect(format!("sqlite:///{}?mode=rwc", full_path_str)).await?;
+    tracing::info!("{}", format!("Directory: sqlite:///{}?mode=rwc", full_path_str));
+    let db: DatabaseConnection = Database::connect(
+        format!("sqlite:///{}?mode=rwc", full_path_str)
+    ).await?;
 
     // lock db connection
     DB_CONN.set(db.to_owned()).unwrap();
@@ -74,29 +84,45 @@ pub async fn insert_entry(new_entry: Model) -> Result<(), DbError> {
 }
 
 #[tauri::command]
-pub async fn update_entry(old_name: String, updated_entry: OptionalModel) -> Result<bool, DbError> {
+pub async fn update_entry(
+    old_name: String,
+    updated: OptionalModel,
+) -> Result<bool, DbError> {
     let db_conn = conn()?;
-    let mut old_entry: ActiveModel = match get_entry(old_name).await? {
-        Some(r) => r.into(),
-        None => return Err(DbError::EntryNotFound)
-    };
-    
-    // update old entry with new changes
-    if let Some(r) = updated_entry.name {  
-        old_entry.name = Set(r);
+
+    let mut query = Entity::update_many()
+        .filter(Column::Name.eq(old_name));
+
+    let mut has_updates = false;
+
+    if let Some(name) = updated.name {
+        query = query.col_expr(Column::Name, Expr::value(name));
+        has_updates = true;
     }
 
-    if let Some(r) = updated_entry.date {  
-        old_entry.date = Set(r);
+    if let Some(date) = updated.date {
+        query = query.col_expr(Column::Date, Expr::value(date));
+        has_updates = true;
     }
 
-    if let Some(r) = updated_entry.path {
-        old_entry.path = Set(r);
+    if let Some(path) = updated.path {
+        query = query.col_expr(Column::Path, Expr::value(path));
+        has_updates = true;
     }
 
-    old_entry.update(db_conn).await?;
+    // Avoid executing an update with no columns.
+    if !has_updates {
+        return Err(DbError::NoCommandedUpdate);
+    }
 
-    Ok(true)
+    let result = query.exec(db_conn).await?;
+
+    if result.rows_affected == 1 {
+        full_update_frontend().await?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 #[tauri::command]
@@ -111,10 +137,11 @@ pub async fn close() -> Result<(), DbError> {
     // Closing connection here
     match db_conn.close().await {
         Ok(()) => tracing::info!("Database closed successfully"),
-        Err(e) => tracing::info!(
-            "{}",
-            format!("Attempted to close database but encountered an error: {e}")
-        ),
+        Err(e) =>
+            tracing::info!(
+                "{}",
+                format!("Attempted to close database but encountered an error: {e}")
+            ),
     }
     Ok(())
 }

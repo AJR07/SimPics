@@ -12,8 +12,8 @@ pub enum DbError {
     AppHandleNotAvail,
     #[error("multiple rows deleted")]
     MultipleRowsDeleted,
-    #[error("object not found")]
-    EntryNotFound,
+    #[error("no update commanded")]
+    NoCommandedUpdate,
     #[error("database error: {0}")]
     Db(#[from] sea_orm::DbErr),
 }
