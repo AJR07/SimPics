@@ -1,9 +1,8 @@
-use chrono::{ DateTime, Utc };
 use std::collections::HashMap;
 use std::fs;
 use tauri::AppHandle;
 
-use crate::db::{ commands, screenshot_schema::{ Model, OptionalModel } };
+use crate::{db::{ commands, screenshot_schema::{ Model, OptionalModel } }, fs::utils::get_file_details};
 
 use crate::store;
 
@@ -54,26 +53,10 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
             continue;
         }
 
-        let name = entry.file_name().to_string_lossy().into_owned();
-
-        // TODO: SUPPORT PARSING DATETIME FROM FILE NAME WITH UTC INPUT
-        // retrieve date using the file's creation date (system-time => UTC)
-        let file_created_date: DateTime<Utc> = match fs::metadata(&path).and_then(|m| m.created()) {
-            Ok(created) => DateTime::<Utc>::from(created),
-            Err(e) => {
-                tracing::error!("Cannot get created time from metadata: {e}");
-                // TODO: default for now is current time
-                Utc::now()
-            }
-        };
-
-        let new_screenshot = Model {
-            name: name.to_string(),
-            date: file_created_date,
-            path: path.to_string_lossy().to_string(),
-        };
-
-        res.push(new_screenshot);
+        match get_file_details(&path) {
+            Ok(model) => res.push(model),
+            Err(e) => tracing::error!("Cannot read file details for {path:?}: {e}"),
+        }
     }
 
     Ok(res)

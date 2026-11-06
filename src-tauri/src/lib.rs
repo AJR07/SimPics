@@ -75,7 +75,7 @@ pub async fn run() {
                     }
                 };
 
-                if let Err(e) = crate::fs::watch::async_watch(handle, path).await {
+                if let Err(e) = crate::fs::watch::async_watch(path).await {
                     println!("error: {e:?}")
                 }
             });

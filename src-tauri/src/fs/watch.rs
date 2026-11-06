@@ -1,4 +1,3 @@
-use chrono::{ DateTime, Utc };
 use futures::{ channel::mpsc::{ channel, Receiver }, SinkExt, StreamExt };
 use notify::{
     Config,
@@ -9,38 +8,9 @@ use notify::{
     Watcher,
     event::{ ModifyKind, RenameMode },
 };
-use std::{ fs, path::{ Path, PathBuf } };
-use tauri::AppHandle;
+use std::path::{ Path, PathBuf };
 
-use crate::db::{ self, screenshot_schema::{ Model, OptionalModel } };
-
-fn get_file_details(file_path: PathBuf) -> Result<Model, String> {
-    let metadata = fs
-        ::metadata(&file_path)
-        .map_err(|e| format!("Cannot read metadata for {}: {e}", file_path.display()))?;
-
-    let name = file_path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| "Cannot get a valid UTF-8 file name".to_string())?
-        .to_string();
-
-    let date = metadata.created().map_err(|e| format!("Cannot read creation time: {e}"))?;
-
-    let date_utc: DateTime<Utc> = date.into();
-
-    Ok(Model {
-        name,
-        date: date_utc,
-        path: file_path.to_string_lossy().to_string(),
-    })
-}
-
-fn file_name_string(p: &Path) -> Option<String> {
-    p.file_name()
-        .and_then(|n| n.to_str())
-        .map(str::to_owned)
-}
+use crate::{db::{ self, screenshot_schema::OptionalModel }, fs::utils::{file_name_string, get_file_details}};
 
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (mut tx, rx) = channel(1);
@@ -140,7 +110,7 @@ async fn rename_entry(old_path: &Path, new_path: &Path) {
 }
 
 // ^ Function handling all the events for watch
-pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Result<()> {
+pub async fn async_watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
     let (mut watcher, mut rx) = async_watcher()?;
 
     // watch directories
@@ -163,7 +133,7 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
                                 continue;
                             }
 
-                            let new_entry = match get_file_details(path.clone()) {
+                            let new_entry = match get_file_details(&path.clone()) {
                                 Ok(r) => r,
                                 Err(e) => {
                                     tracing::error!(
