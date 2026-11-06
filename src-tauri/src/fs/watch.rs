@@ -10,7 +10,7 @@ use notify::{
 };
 use std::path::{ Path, PathBuf };
 
-use crate::{db::{ self, screenshot_schema::OptionalModel }, fs::utils::{file_name_string, get_file_details}};
+use crate::{db::{ self, screenshot_schema::OptionalModel }, fs::utils::{file_name_string, get_file_details, is_image_file}};
 
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (mut tx, rx) = channel(1);
@@ -81,6 +81,11 @@ async fn rename_entry(old_path: &Path, new_path: &Path) {
         return;
     }
 
+    if !is_image_file(new_path) {
+        tracing::debug!("Ignoring rename of non-image: {old_path:?} -> {new_path:?}");
+        return;
+    }
+
     let Some(new_name) = file_name_string(new_path) else {
         tracing::error!("New path has no valid UTF-8 file name: {new_path:?}");
         return;
@@ -130,6 +135,12 @@ pub async fn async_watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
                             // ignore folders
                             if path.is_dir() {
                                 tracing::debug!("Ignoring directory create: {path:?}");
+                                continue;
+                            }
+
+                            // ignore anything that isn't an image
+                            if !is_image_file(&path) {
+                                tracing::debug!("Ignoring non-image create: {path:?}");
                                 continue;
                             }
 

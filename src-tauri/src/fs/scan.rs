@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use tauri::AppHandle;
 
-use crate::{db::{ commands, screenshot_schema::{ Model, OptionalModel } }, fs::utils::get_file_details};
+use crate::{db::{ commands, screenshot_schema::{ Model, OptionalModel } }, fs::utils::{get_file_details, is_image_file}};
 
 use crate::store;
 
@@ -50,6 +50,11 @@ pub fn full_scan(app: AppHandle) -> Result<Vec<Model>, String> {
 
         if !path.is_file() {
             tracing::debug!("Skipping non-file: {path:?}");
+            continue;
+        }
+
+        if !is_image_file(&path) {
+            tracing::debug!("Skipping non-image: {path:?}");
             continue;
         }
 

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use image::ImageReader;
 use std::{fs, path::Path};
 
 use crate::db::screenshot_schema::Model;
@@ -29,4 +30,11 @@ pub fn file_name_string(p: &Path) -> Option<String> {
     p.file_name()
         .and_then(|n| n.to_str())
         .map(str::to_owned)
+}
+
+pub fn is_image_file(p: &Path) -> bool {
+	ImageReader::open(p)
+        .and_then(|r| r.with_guessed_format())
+        .map(|r| r.format().is_some())
+        .unwrap_or(false)
 }
