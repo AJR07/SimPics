@@ -10,7 +10,7 @@ use notify::{
     event::{ ModifyKind, RenameMode },
 };
 use std::{ fs, path::{ Path, PathBuf } };
-use tauri::{ AppHandle, Emitter };
+use tauri::AppHandle;
 
 use crate::db::{ self, screenshot_schema::{ Model, OptionalModel } };
 
@@ -143,9 +143,8 @@ async fn rename_entry(old_path: &Path, new_path: &Path) {
 pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Result<()> {
     let (mut watcher, mut rx) = async_watcher()?;
 
-    // Add a path to be watched. All files and directories at that path and
-    // below will be monitored for changes.
-    watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
+    // watch directories
+    watcher.watch(path.as_ref(), RecursiveMode::NonRecursive)?;
 
     // handler for From/To events
     let mut tracker = RenameTracker::default();
@@ -155,9 +154,16 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
             Ok(event) => {
                 // * handle each event
                 match event.kind {
+                    // ^ create arm
                     EventKind::Create(_) => {
                         for path in event.paths {
-                            let new_entry = match get_file_details(path) {
+                            // ignore folders
+                            if path.is_dir() {
+                                tracing::debug!("Ignoring directory create: {path:?}");
+                                continue;
+                            }
+
+                            let new_entry = match get_file_details(path.clone()) {
                                 Ok(r) => r,
                                 Err(e) => {
                                     tracing::error!(
@@ -166,12 +172,25 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
                                     continue;
                                 }
                             };
-                            let _ = db::commands::insert_entry(new_entry).await.map_err(|e| {
-                                tracing::error!("WATCH x DB ERROR when applying insert event: {e}");
-                            });
-                            tracing::warn!("Created");
+
+                            let file_name = file_name_string(&path);
+
+                            match db::commands::insert_entry(new_entry).await {
+                                Ok(()) => tracing::warn!("Created {file_name:?}"),
+                                Err(e) =>
+                                    tracing::error!(
+                                        "WATCH x DB ERROR when applying insert event: {e}"
+                                    ),
+                            };
                         }
                     }
+
+                    // some metadata change, NFA (no further action)
+                    EventKind::Modify(
+                        ModifyKind::Any | ModifyKind::Data(_) | ModifyKind::Metadata(_),
+                    ) => {}
+
+                    // ^ renames arm
                     EventKind::Modify(ModifyKind::Name(RenameMode::From)) =>
                         tracker.on_from(&event.paths),
                     EventKind::Modify(ModifyKind::Name(RenameMode::To)) => {
@@ -184,6 +203,8 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
                             "WATCH: unhandled Modify kind: {other:?} with full event data: {event:?}"
                         );
                     }
+
+                    // ^ remove arm
                     EventKind::Remove(_) => {
                         for path in event.paths {
                             let Some(file_name) = file_name_string(&path) else {
@@ -191,10 +212,10 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
                                 continue;
                             };
                             match db::commands::delete_entry(file_name.clone()).await {
-                                Ok(true) => tracing::warn!("Deleted"),
+                                Ok(true) => tracing::warn!("Deleted {file_name}"),
                                 Ok(false) =>
-                                    tracing::error!(
-                                        "WATCH x DB ERROR when applying delete event: {file_name} does not exist"
+                                    tracing::warn!(
+                                        "WATCH x DB ERROR when applying delete event: {file_name} does not exist, could be a folder"
                                     ),
                                 Err(e) =>
                                     tracing::error!(
