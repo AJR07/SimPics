@@ -49,7 +49,9 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Resul
     // You can also access each implementation directly e.g. INotifyWatcher.
     let watcher = RecommendedWatcher::new(move |res| {
         futures::executor::block_on(async {
-            tx.send(res).await.unwrap();
+            if let Err(e) = tx.send(res).await {
+                tracing::error!("WATCH ERROR: could not forward event, receiver closed: {e}");
+            }
         })
     }, Config::default())?;
 
@@ -207,10 +209,7 @@ pub async fn async_watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Res
                     }
                 }
             }
-            Err(e) => {
-                app.emit("file-watcher_error", format!("watch error: {e:?}")).unwrap();
-                tracing::error!("WATCH ERROR: {e:?}");
-            }
+            Err(e) => tracing::error!("WATCH ERROR: {e:?}"),
         }
     }
 
