@@ -2,7 +2,10 @@ use std::collections::HashMap;
 use std::fs;
 use tauri::AppHandle;
 
-use crate::{db::{ commands, screenshot_schema::{ Model, OptionalModel } }, fs::utils::{get_file_details, is_image_file}};
+use crate::{
+    db::{ commands, screenshot_schema::{ Model, OptionalModel } },
+    fs::utils::{ get_file_details, is_image_file },
+};
 
 use crate::store;
 
@@ -125,15 +128,17 @@ pub async fn apply_full_changes(app: AppHandle) -> Result<(), String> {
     let mut failures = 0usize;
 
     for entry in to_insert {
-        if let Err(e) = commands::insert_entry(entry).await {
+        if let Err(e) = commands::insert_entry(entry.clone()).await {
             tracing::error!("Cannot insert entry due to: {e}");
             failures += 1;
+        } else {
+            tracing::warn!("Created {:?}", entry.name);
         }
     }
 
     for (name, patch) in to_update {
-        match commands::update_entry(name.clone(), patch).await {
-            Ok(true) => {}
+        match commands::update_entry(name.clone(), patch.clone()).await {
+            Ok(true) => tracing::warn!("Updated {patch:?}"),
             Ok(false) => tracing::warn!("Update skipped, {name} is no longer in the DB"),
             Err(e) => {
                 tracing::error!("Cannot update entry {name} due to: {e}");
@@ -145,7 +150,7 @@ pub async fn apply_full_changes(app: AppHandle) -> Result<(), String> {
     for entry in to_delete {
         let name = entry.name;
         match commands::delete_entry(name.clone()).await {
-            Ok(true) => {}
+            Ok(true) => tracing::warn!("Deleted {name}"),
             Ok(false) => tracing::warn!("Delete skipped, {name} is already gone from the DB"),
             Err(e) => {
                 tracing::error!("Cannot delete entry {name} due to: {e}");
