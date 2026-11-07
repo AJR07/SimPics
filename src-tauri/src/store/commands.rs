@@ -109,10 +109,16 @@ pub async fn req_screenshot_dir(app: AppHandle) -> Result<ScreenshotResult, Stri
 
     // ^ Then restart watch
     unwatch(app.clone())?;
-    watch(app.clone(), new_path.clone()).await.map_err(|e| e.to_string())?;
+
+    let watcher_path = new_path.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = watch(app, new_path).await {
+            tracing::error!("Screenshot watcher stopped: {error}");
+        }
+    });
 
     Ok(ScreenshotResult {
         valid: true,
-        cur_path: new_path,
+        cur_path: watcher_path,
     })
 }
