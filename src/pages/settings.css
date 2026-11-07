@@ -1,15 +1,45 @@
 .container {
-	padding: 1rem;
-	padding-left: 0rem;
+    padding: 1rem;
+    padding-left: 0;
 }
 
 .row {
-	display: flex;
-	flex-direction: row;
-	gap: 1rem;
-	width: 100%;
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 1rem;
+    width: 100%;
 }
 
 .textfield {
-	flex: 1;
+    flex: 1;
+}
+
+.loading {
+    color: #6b7280;
+}
+
+.status_error {
+    margin-top: 1rem;
+    color: #991b1b;
+}
+
+.indicator_success,
+.indicator_error {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 1.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.indicator_success {
+    color: #0c5e2a;
+}
+
+.indicator_error {
+    color: #771414;
 }

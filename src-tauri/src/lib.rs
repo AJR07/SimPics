@@ -17,6 +17,7 @@ pub async fn run() {
         .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -24,6 +25,8 @@ pub async fn run() {
             store::commands::get_store_value,
             store::commands::set_store_value,
             store::commands::get_store_value_with_default,
+            store::commands::get_screenshot_dir,
+            store::commands::req_screenshot_dir,
             db::commands::get_entry,
             db::commands::delete_entry,
             db::commands::insert_entry,
