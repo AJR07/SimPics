@@ -1,4 +1,4 @@
-use crate::{db::commands::get_full_table, APP_HANDLE};
+use crate::{ db::commands::get_full_table, APP_HANDLE };
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use tauri::Emitter;
@@ -14,8 +14,9 @@ pub enum DbError {
     MultipleRowsDeleted,
     #[error("no update commanded")]
     NoCommandedUpdate,
-    #[error("database error: {0}")]
-    Db(#[from] sea_orm::DbErr),
+    #[error("failed to emit frontend event: {0}")] 
+    EventEmit(String),
+    #[error("database error: {0}")] Db(#[from] sea_orm::DbErr),
 }
 
 // Tauri needs errors to be serializable to send them to the frontend
@@ -41,6 +42,8 @@ fn app_handle() -> Result<&'static tauri::AppHandle, DbError> {
 pub async fn full_update_frontend() -> Result<(), DbError> {
     let app_handle = app_handle()?;
     let full_table = get_full_table().await?;
-    app_handle.emit("new_full_db", full_table).unwrap();
+    app_handle
+        .emit("new_full_db", full_table)
+        .map_err(|error| DbError::EventEmit(error.to_string()))?;
     Ok(())
 }

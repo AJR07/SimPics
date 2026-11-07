@@ -3,6 +3,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
+use js_sys::Function;
 
 #[wasm_bindgen]
 extern "C" {
@@ -19,7 +20,7 @@ extern "C" {
     ) -> Result<JsValue, JsValue>;
 }
 
-/// Calls a Tauri command and converts every failure mode into a `String` error.
+// Calls a Tauri command and converts every failure mode into a `String` error.
 pub async fn call<T: DeserializeOwned>(cmd: &str, args: Value) -> Result<T, String> {
     let args = to_value(&args).map_err(|e| format!("Serialize error: {e}"))?;
 
@@ -28,4 +29,19 @@ pub async fn call<T: DeserializeOwned>(cmd: &str, args: Value) -> Result<T, Stri
         .map_err(|e| e.as_string().unwrap_or_else(|| "Unknown error".into()))?;
 
     serde_wasm_bindgen::from_value(result).map_err(|e| format!("Deserialize error: {e}"))
+}
+
+pub fn unlisten(listener: JsValue) -> Result<(), String> {
+    let function = listener
+        .dyn_ref::<Function>()
+        .ok_or_else(|| "Tauri returned an invalid unlisten function".to_string())?;
+
+    function
+        .call0(&JsValue::NULL)
+        .map(|_| ())
+        .map_err(|error| {
+            error
+                .as_string()
+                .unwrap_or_else(|| "Failed to remove event listener".to_string())
+        })
 }
