@@ -4,6 +4,8 @@ use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_dialog::DialogExt;
 
+use crate::fs::{ scan::apply_full_changes, watch::{ unwatch, watch } };
+
 //* 3 Core Commands
 
 #[tauri::command]
@@ -55,7 +57,7 @@ const DEFAULT_SCREENSHOTS_DIR: &str = "C:\\Users\\User\\Pictures\\Screenshots";
 #[derive(Serialize)]
 pub struct ScreenshotResult {
     valid: bool,
-    cur_path: String
+    cur_path: String,
 }
 
 #[tauri::command]
@@ -70,14 +72,13 @@ pub fn get_screenshot_dir(app: AppHandle) -> Result<String, String> {
 
 // use the folder directory window to pick a directory
 #[tauri::command]
-pub fn req_screenshot_dir(app: AppHandle) -> Result<ScreenshotResult, String> {
+pub async fn req_screenshot_dir(app: AppHandle) -> Result<ScreenshotResult, String> {
     let Some(new_path) = app
         .dialog()
         .file()
         .set_title("Select a folder")
         .blocking_pick_folder()
-        .map(|path| path.to_string())
-    else {
+        .map(|path| path.to_string()) else {
         return Ok(ScreenshotResult {
             valid: false,
             cur_path: get_screenshot_dir(app)?,
@@ -93,11 +94,22 @@ pub fn req_screenshot_dir(app: AppHandle) -> Result<ScreenshotResult, String> {
         });
     }
 
+    // ^ All OK, set store value
+    tracing::warn!("Screenshot Directory Changed, reconfiguring: {:?}", new_path.clone());
     set_store_value(
-        app,
+        app.clone(),
         SCREENSHOTS_KEY.to_string(),
-        serde_json::Value::String(new_path.clone()),
+        serde_json::Value::String(new_path.clone())
     )?;
+    tracing::warn!("Store value set successfully!");
+
+    // ^ Then restart watch and scan
+    apply_full_changes(app.clone()).await?;
+    tracing::warn!("Full scan completed successfully!");
+
+    // ^ Then restart watch
+    unwatch(app.clone())?;
+    watch(app.clone(), new_path.clone()).await.map_err(|e| e.to_string())?;
 
     Ok(ScreenshotResult {
         valid: true,

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use serde_json::Value::Null;
 use simpics_shared::ScreenshotEntry;
-use wasm_bindgen::{JsValue, prelude::Closure};
+use wasm_bindgen::{ JsValue, prelude::Closure };
 
 use crate::utils::js_cmds;
 
@@ -23,7 +23,8 @@ pub fn Home() -> Element {
 
     use_hook(|| {
         let handler = Closure::<dyn FnMut(JsValue)>::new(move |event: JsValue| {
-            let payload = js_sys::Reflect::get(&event, &JsValue::from_str("payload"))
+            let payload = js_sys::Reflect
+                ::get(&event, &JsValue::from_str("payload"))
                 .unwrap_or(JsValue::NULL);
 
             match serde_wasm_bindgen::from_value::<Vec<ScreenshotEntry>>(payload) {
@@ -33,16 +34,21 @@ pub fn Home() -> Element {
         });
 
         spawn(async move {
-            // listen first, so no update can slip through during the initial load
-            if let Err(e) = js_cmds::listen("new_full_db", &handler).await {
-                status.set(Some(format!("couldn't initiate listener: {e:?}")));
+            match js_cmds::listen("new_full_db", &handler).await {
+                Ok(unlisten) => {
+                    // Keep the listener active while Home exists.
+                    // It will be removed when Home is dropped.
+                    use_drop(move || {
+                        let _ = js_sys::Function::from(unlisten).call0(&JsValue::NULL);
+                    });
+                }
+                Err(e) => {
+                    status.set(Some(format!("couldn't initiate listener: {e:?}")));
+                }
             }
-            handler.forget();
 
-            // initial load, once
             match js_cmds::call::<Vec<ScreenshotEntry>>("get_full_table", Null).await {
                 Ok(list) => {
-                    // don't clobber a newer list if an event already arrived
                     if screenshot_list.peek().is_none() {
                         screenshot_list.set(Some(list));
                     }

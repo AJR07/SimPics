@@ -4,6 +4,8 @@ mod store;
 use std::sync::OnceLock;
 use tauri::WindowEvent;
 
+use crate::fs::watch::{WatcherState, watch};
+
 const SCREENSHOTS_KEY: &str = "screenshots_dir";
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
@@ -11,28 +13,29 @@ static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
     //* initialize tracing
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::WARN)
-        .with_test_writer()
-        .init();
+    tracing_subscriber::fmt().with_max_level(tracing::Level::WARN).with_test_writer().init();
 
-    tauri::Builder::default()
+    tauri::Builder
+        ::default()
+        .manage(WatcherState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![
-            store::commands::get_store_value,
-            store::commands::set_store_value,
-            store::commands::get_store_value_with_default,
-            store::commands::get_screenshot_dir,
-            store::commands::req_screenshot_dir,
-            db::commands::get_entry,
-            db::commands::delete_entry,
-            db::commands::insert_entry,
-            db::commands::update_entry,
-            db::commands::get_full_table
-        ])
+        .invoke_handler(
+            tauri::generate_handler![
+                store::commands::get_store_value,
+                store::commands::set_store_value,
+                store::commands::get_store_value_with_default,
+                store::commands::get_screenshot_dir,
+                store::commands::req_screenshot_dir,
+                db::commands::get_entry,
+                db::commands::delete_entry,
+                db::commands::insert_entry,
+                db::commands::update_entry,
+                db::commands::get_full_table
+            ]
+        )
         .on_window_event(|_, event| {
             if let WindowEvent::CloseRequested { .. } = event {
                 // clean DB
@@ -50,21 +53,17 @@ pub async fn run() {
             tauri::async_runtime::spawn(async move {
                 // * initialize database
                 match db::commands::init(handle.clone()).await {
-                    Ok(r) => {
-                        tracing::info!("Database initialized successfully.");
-                        r
-                    }
+                    Ok(_) => tracing::info!("Database initialized successfully."),
                     Err(e) => {
                         tracing::error!("Failed to initialize database: {}", e);
-                        panic!("{}", "Unrecoverable - DB")
+                        panic!("{}", "Unrecoverable - DB");
                     }
-                };
+                }
 
                 // * watch for changes
-                let path = match store::commands::get_store_value(
-                    handle.clone(),
-                    SCREENSHOTS_KEY.to_string(),
-                ) {
+                let path = match
+                    store::commands::get_store_value(handle.clone(), SCREENSHOTS_KEY.to_string())
+                {
                     Ok(serde_json::Value::String(path)) => path,
                     Ok(value) => {
                         println!(
@@ -78,7 +77,7 @@ pub async fn run() {
                     }
                 };
 
-                if let Err(e) = crate::fs::watch::async_watch(path).await {
+                if let Err(e) = watch(handle.clone(), path).await {
                     println!("error: {e:?}")
                 }
             });

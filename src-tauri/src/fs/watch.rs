@@ -8,9 +8,14 @@ use notify::{
     Watcher,
     event::{ ModifyKind, RenameMode },
 };
+use tauri::{AppHandle, Manager};
 use std::path::{ Path, PathBuf };
+use std::sync::Mutex;
 
-use crate::{db::{ self, screenshot_schema::OptionalModel }, fs::utils::{file_name_string, get_file_details, is_image_file}};
+use crate::{
+    db::{ self, screenshot_schema::OptionalModel },
+    fs::utils::{ file_name_string, get_file_details, is_image_file },
+};
 
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (mut tx, rx) = channel(1);
@@ -114,12 +119,22 @@ async fn rename_entry(old_path: &Path, new_path: &Path) {
     }
 }
 
-// ^ Function handling all the events for watch
-pub async fn async_watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
+// ^ Watch/Unwatch Main Function
+
+// mutex helper to store the current watcher
+// this is managed by the tauri app builder in lib.rs
+#[derive(Default)]
+pub struct WatcherState(Mutex<Option<RecommendedWatcher>>);
+
+pub async fn watch<P: AsRef<Path>>(app: AppHandle, path: P) -> notify::Result<()> {
     let (mut watcher, mut rx) = async_watcher()?;
 
     // watch directories
     watcher.watch(path.as_ref(), RecursiveMode::NonRecursive)?;
+
+    // lock the watcher into the state
+    let state = app.state::<WatcherState>();
+    *state.0.lock().unwrap() = Some(watcher);
 
     // handler for From/To events
     let mut tracker = RenameTracker::default();
@@ -215,5 +230,13 @@ pub async fn async_watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+pub fn unwatch(app: AppHandle) -> Result<(), String> {
+    let watcher_state = app.state::<WatcherState>();
+    let watcher_loc = watcher_state.0.lock();
+    watcher_loc.map_err(|e| e.to_string())?.take();
+    
     Ok(())
 }
