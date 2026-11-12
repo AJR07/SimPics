@@ -29,8 +29,8 @@ pub fn App() -> Element {
             rel: "stylesheet",
             href: "https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap",
         }
-        link { rel: "stylesheet", href: CSS }
         link { rel: "stylesheet", href: DX_THEME }
+        link { rel: "stylesheet", href: CSS }
         main {
             crate::components::navbar::Navbar { active_page }
             match page {
