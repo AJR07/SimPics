@@ -34,6 +34,7 @@ html[data-theme="light"] [class~="dxc-system"] {
 
 :root {
   /* Primary colors */
+  --primary-rgb: 88 235 100;
   --primary-color: var(--dark, #58eb64) var(--light, #58eb64);
   --primary-color-1: var(--dark, #163d1a) var(--light, #163d1a);
   --primary-color-2: var(--dark, #286b30) var(--light, #286b30);
@@ -44,6 +45,7 @@ html[data-theme="light"] [class~="dxc-system"] {
   --primary-color-7: var(--dark, #d7ffda) var(--light, #d7ffda);
 
   /* Secondary colors */
+  --secondary-rgb: 0 0 0;
   --secondary-color: var(--dark, #000) var(--light, #000);
   --secondary-color-1: var(--dark, #0a0a0a) var(--light, #0a0a0a);
   --secondary-color-2: var(--dark, #1a1a1a) var(--light, #1a1a1a);
